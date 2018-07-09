@@ -10,6 +10,7 @@ import Html.Attributes exposing (class)
 import Html.Events as Events
 import LocalStorage as LS
 import Task
+import Random
 
 ---- MODEL ----
 
@@ -46,6 +47,8 @@ type Msg
     | FileContentsGot (Result FileReader.Error String)
     | ItemSet ()
     | ItemGet (Maybe DeckSource)
+    | Shuffle
+    | RandomGot (List Float)
 
 
 subscriptions : Model -> Sub Msg
@@ -88,6 +91,12 @@ update msg model =
             in
                 {model | deck = List.map Dict.fromList deckSource} ! [LS.setDeckReq ("DEV-1", deckSource)]
 
+        Shuffle ->
+            model ! [getShuffleSource <| List.length model.deck]
+
+        RandomGot source ->
+            {model | deck = shuffle source model.deck} ! []
+
         _ -> model ! []
 
 
@@ -95,6 +104,22 @@ getFileContents : NativeFile -> Cmd Msg
 getFileContents file =
     FileReader.readAsTextFile file.blob
         |> Task.attempt FileContentsGot
+
+
+getShuffleSource : Int -> Cmd Msg
+getShuffleSource n =
+    let
+        gen = Random.list n (Random.float 0 1)
+    in
+        Random.generate RandomGot gen
+
+
+shuffle : List Float -> List a -> List a
+shuffle source seq =
+        zip seq source
+        |> List.sortBy Tuple.second
+        |> List.map Tuple.first
+
 
 ---- VIEW ----
 
@@ -105,7 +130,7 @@ view model =
         dropZoneClass = dropZoneClass_ model.dragHovering
     in
         div []
-            [ h1 [] [ text "Your Elm App is working!"]
+            [ h1 [] [ text "デッキをシャッフルしてみるやつ" ]
             , div dropZoneClass
                 [ Html.input
                     [ Attr.type_ "file"
@@ -113,7 +138,8 @@ view model =
                     , Attr.multiple False
                     ] []
                 ]
-            , p [] [ text model.message]
+            , p [] [ text model.message ]
+            , Html.button [ Events.onClick Shuffle ] [ text "シャッフルする" ]
             , deckTable model.deck
             ]
 
@@ -136,6 +162,8 @@ deckTable deck =
             List.map (\dict ->
                 tr []
                     [ td [] [  Dict.get "ID"   dict |>  Maybe.withDefault "" |> text ]
+                    , td [] [  Dict.get "level" dict |>  Maybe.withDefault "" |> (\s -> "Lv" ++ s) |> text ]
+                    , td [] [  Dict.get "mana" dict |>  Maybe.withDefault "" |> (\s -> s ++ "mana") |> text ]
                     , td [] [  Dict.get "card_name" dict |>  Maybe.withDefault "" |> text ]
                     ]) deck
     in
