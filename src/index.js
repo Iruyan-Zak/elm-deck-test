@@ -5,3 +5,14 @@ const mountNode = document.getElementById('main');
 
 const app = Elm.Main.embed(mountNode);
 
+app.ports.getItemReq.subscribe(function(key) {
+  const obj = JSON.parse(localStorage.getItem(key));
+  app.ports.getItemRes.send(obj);
+});
+
+app.ports.setItemReq.subscribe(function(args) {
+  const [key, value] = args;
+  console.log(value);
+  localStorage.setItem(key, JSON.stringify(value));
+  app.ports.setItemRes.send(null);
+});
