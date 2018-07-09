@@ -1,5 +1,4 @@
 port module LocalStorage exposing (..)
-import Json.Encode exposing (Value)
 
 
 type alias Record =
