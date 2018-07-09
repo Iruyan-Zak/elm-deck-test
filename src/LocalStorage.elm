@@ -2,7 +2,13 @@ port module LocalStorage exposing (..)
 import Json.Encode exposing (Value)
 
 
-port getItemReq : String -> Cmd msg
-port setItemReq : (String, Value) -> Cmd msg
-port getItemRes : (Maybe Value -> msg) -> Sub msg
-port setItemRes : (() -> msg) -> Sub msg
+type alias Record =
+    { id : String
+    , name : String
+    }
+
+
+port getDeckReq : String -> Cmd msg
+port setDeckReq : (String, List Record) -> Cmd msg
+port getDeckRes : (Maybe (List Record) -> msg) -> Sub msg
+port setDeckRes : (() -> msg) -> Sub msg

@@ -7,7 +7,6 @@ import Html.Events as Events
 import CsvDecode exposing ((|=))
 import CsvDecode
 import LocalStorage as LS
-import Json.Encode exposing (Value, list, string, object)
 
 ---- MODEL ----
 
@@ -22,32 +21,8 @@ type alias Model =
 
 
 init : ( Model, Cmd Msg )
-init =
-    let
-        csv_data = """
-id,name
-DEV-1,This is name
-DEV-2,名前
-"""
-        model = buildFromCSV csv_data
-    in
-        model ! case model of
-            Ok data -> [LS.setItemReq ("DEV-1", toValue data)]
-            Err msg -> [LS.setItemReq ("DEV-0", string "ERROR")]
+init = Err "Not loaded." ! [LS.getDeckReq "DEV-1"]
 
-
-toValue : List Record -> Value
-toValue model =
-    let
-        contents =
-            List.map (\{id, name} ->
-                object
-                    [ ("id", string id)
-                    , ("name", string name)
-                    ]
-                ) model
-    in
-        list contents
 
 ---- UPDATE ----
 
@@ -55,25 +30,37 @@ toValue model =
 type Msg
     = NoOp
     | ItemSet ()
-    | ItemGet (Maybe Value)
+    | ItemGet (Maybe (List Record))
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ LS.setItemRes ItemSet
-        , LS.getItemRes ItemGet
+        [ LS.setDeckRes ItemSet
+        , LS.getDeckRes ItemGet
         ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    model ! []
-    {-
     case msg of
-        RecordLoaded recordList ->
-            recordList ! []
-    -}
+        NoOp ->
+            model ! []
+
+        ItemSet () ->
+            let
+                _ = Debug.log "setItem succeeded." ()
+            in
+                model ! []
+
+        ItemGet valueMaybe ->
+            case valueMaybe of
+                Nothing ->
+                    Err "getItem failed."! []
+
+                Just records ->
+                    Ok records ! []
+
 
 ---- VIEW ----
 
