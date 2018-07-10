@@ -2,9 +2,8 @@ module Main exposing (..)
 
 import Dict exposing (Dict)
 import FileReader exposing (NativeFile)
-import FileReader.FileDrop as DZ
 import Html
-import Html exposing (Html, div, table, tr, td, h1, p, text)
+import Html exposing (Html, div, table, tr, td, h1, h2, p, text)
 import Html.Attributes as Attr
 import Html.Attributes exposing (class)
 import Html.Events as Events
@@ -22,13 +21,18 @@ type alias Deck =
     List (Dict String String)
 
 type alias Model =
-    { deck : Deck
+    { fileSet : Bool
+    , deck : Deck
+    , newDeckName : String
+    , deckNames : List String
     , message : String
     }
 
 
 init : ( Model, Cmd Msg )
-init = Model [] "Deck is not loaded." ! [LS.getDeckReq "DEV-1"]
+init =
+    Model False [] "" [] "Deck is not loaded."
+        ! [LS.getDeckNamesReq ()]
 
 
 ---- UPDATE ----
@@ -38,29 +42,27 @@ type Msg
     = NoOp
     | OnDrop (List NativeFile)
     | FileContentsGot (Result FileReader.Error String)
-    | ItemSet ()
     | ItemGet (Maybe DeckSource)
     | Shuffle
     | RandomGot (List Float)
+    | ChangenewDeckName String
+    | Register
+    | DeckNamesGot (List String)
+    | LoadDeck String
+    | RemoveDeck String
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ LS.setDeckRes ItemSet
-        , LS.getDeckRes ItemGet
+        [ LS.getDeckRes ItemGet
+        , LS.getDeckNamesRes DeckNamesGot
         ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ItemSet () ->
-            let
-                _ = Debug.log "setItem succeeded." ()
-            in
-                model ! []
-
         ItemGet valueMaybe ->
             case valueMaybe of
                 Nothing ->
@@ -78,13 +80,34 @@ update msg model =
             let
                 deckSource = parseCSV csv
             in
-                {model | deck = List.map Dict.fromList deckSource} ! [LS.setDeckReq ("DEV-1", deckSource)]
+                {model
+                    | deck = List.map Dict.fromList deckSource
+                    , fileSet = True
+                    } ! []
 
         Shuffle ->
             model ! [getShuffleSource <| List.length model.deck]
 
         RandomGot source ->
             {model | deck = shuffle source model.deck} ! []
+
+        ChangenewDeckName newDeckName ->
+            {model | newDeckName = newDeckName} ! []
+
+        Register ->
+            { model
+                | newDeckName = ""
+                , fileSet = False
+                } ! [ LS.setDeckReq (model.newDeckName, List.map Dict.toList model.deck) ]
+
+        DeckNamesGot names ->
+            {model | deckNames = names} ! []
+
+        LoadDeck deckName ->
+            model ! [ LS.getDeckReq deckName ]
+
+        RemoveDeck deckName ->
+            model ! [ LS.removeDeckReq deckName ]
 
         _ -> model ! []
 
@@ -116,17 +139,48 @@ shuffle source seq =
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 [] [ text "デッキをシャッフルしてみるやつ" ]
-        , div []
-            [ Html.input
-                [ Attr.type_ "file"
-                , FileReader.onFileChange OnDrop
-                , Attr.multiple False
-                ] []
+        [ Html.header [class "container"] [ h1 [] [ text "デッキをシャッフルしてみるやつ" ] ]
+        , div [class "container"]
+            [ p [] [ text model.message ]
+            , div [class "row"]
+                [ div [class "col-md-8"]
+                    [  h2 [] [ text "ドローテスト" ]
+                    , div [] [ Html.button [ class "c-btn",  Events.onClick Shuffle ] [ text "シャッフルする" ] ]
+                    , div [] [ deckTable model.deck ]
+                    ]
+                , div [class "col-md-4"]
+                    [ div [class "c-pane"]
+                        [ h2 [] [ text "デッキを登録する" ]
+                        , Html.input
+                            [ class "form-control-file"
+                            , Attr.type_ "file"
+                            , FileReader.onFileChange OnDrop
+                            , Attr.multiple False
+                            ] []
+                        ,  div []
+                            [ Html.label [Attr.for "register_deck"] [ text "デッキ名" ]
+                            , Html.input
+                                [ Attr.id "register_deck"
+                                , class "form-control"
+                                , Attr.placeholder "1文字以上のデッキ名"
+                                , Events.onInput ChangenewDeckName
+                                , Events.onBlur <| ChangenewDeckName model.newDeckName
+                                ] []
+                            ]
+                        , Html.button
+                            [ class "c-btn"
+                            , Html.Attributes.disabled
+                                <| String.length model.newDeckName == 0 || not model.fileSet
+                            , Events.onClick Register
+                            ] [ text "登録する" ]
+                        ]
+                    , div [class "c-pane"]
+                        [ h2 [] [ text "デッキを読み込む" ]
+                        , deckNameList model.deckNames
+                        ]
+                    ]
+                ]
             ]
-        , p [] [ text model.message ]
-        , Html.button [ Events.onClick Shuffle ] [ text "シャッフルする" ]
-        , deckTable model.deck
         ]
 
 
@@ -142,8 +196,19 @@ deckTable deck =
                     , td [] [  Dict.get "card_name" dict |>  Maybe.withDefault "" |> text ]
                     ]) deck
     in
-        table [] cells
+        table [class "table"] cells
 
+
+deckNameList : List String -> Html Msg
+deckNameList names =
+    let
+        toRow name =
+            tr []
+                [ td [ class "c-clickable-cell", Events.onClick (LoadDeck name) ] [ text name ]
+                , td [ class "c-clickable-cell", Events.onClick (RemoveDeck name) ] [ text "×"]
+                ]
+    in
+        table [class "table"] <| List.map toRow names
 
 ---- PROGRAM ----
 

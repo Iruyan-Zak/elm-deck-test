@@ -1,5 +1,33 @@
+@import "scss/bootstrap";
+
 $main-padding: 20px;
 
 #main {
     padding: $main-padding;
+}
+
+@mixin shadable {
+  transition: background-color .3s;
+
+  &:hover {
+    background-color: $gray-200;
+  }
+}
+
+.c-pane {
+  margin-bottom: 20px;
+}
+
+.c-btn {
+  @extend .btn;
+  @include shadable;
+
+  background: rgba(0,0,0,0);
+  border: 1.5px solid $gray-600;
+}
+
+.c-clickable-cell {
+  @include shadable;
+
+  cursor: pointer;
 }
