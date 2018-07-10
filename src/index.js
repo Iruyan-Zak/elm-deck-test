@@ -13,7 +13,7 @@ app.ports.getDeckReq.subscribe(function(key) {
 
 app.ports.setDeckReq.subscribe(function(args) {
   const [key, value] = args;
-  console.log(value);
+
   localStorage.setItem(key, JSON.stringify(value));
   app.ports.setDeckRes.send(null);
 });

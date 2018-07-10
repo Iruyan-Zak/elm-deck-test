@@ -15,11 +15,6 @@ import Random
 ---- MODEL ----
 
 
-type alias Record =
-    { id : String
-    , name : String
-    }
-
 type alias DeckSource =
     List (List (String, String))
 
@@ -29,12 +24,11 @@ type alias Deck =
 type alias Model =
     { deck : Deck
     , message : String
-    , dragHovering : Int
     }
 
 
 init : ( Model, Cmd Msg )
-init = Model [] "Deck is not loaded." 0 ! [LS.getDeckReq "DEV-1"]
+init = Model [] "Deck is not loaded." ! [LS.getDeckReq "DEV-1"]
 
 
 ---- UPDATE ----
@@ -42,7 +36,6 @@ init = Model [] "Deck is not loaded." 0 ! [LS.getDeckReq "DEV-1"]
 
 type Msg
     = NoOp
-    | OnDragEnter Int
     | OnDrop (List NativeFile)
     | FileContentsGot (Result FileReader.Error String)
     | ItemSet ()
@@ -74,10 +67,6 @@ update msg model =
                     {model | message = "getItem failed."} ! []
 
                 Just deckSource ->
-                    let
-                        _ = Debug.log (toString deckSource) ()
-                    in
-
                     {model
                         | deck = List.map Dict.fromList deckSource
                         , message = "Deck is loaded."} ! []
@@ -126,33 +115,19 @@ shuffle source seq =
 
 view : Model -> Html Msg
 view model =
-    let
-        dropZoneClass = dropZoneClass_ model.dragHovering
-    in
-        div []
-            [ h1 [] [ text "デッキをシャッフルしてみるやつ" ]
-            , div dropZoneClass
-                [ Html.input
-                    [ Attr.type_ "file"
-                    , FileReader.onFileChange OnDrop
-                    , Attr.multiple False
-                    ] []
-                ]
-            , p [] [ text model.message ]
-            , Html.button [ Events.onClick Shuffle ] [ text "シャッフルする" ]
-            , deckTable model.deck
+    div []
+        [ h1 [] [ text "デッキをシャッフルしてみるやつ" ]
+        , div []
+            [ Html.input
+                [ Attr.type_ "file"
+                , FileReader.onFileChange OnDrop
+                , Attr.multiple False
+                ] []
             ]
-
-
-dropZoneClass_ : Int -> List (Html.Attribute Msg)
-dropZoneClass_ dragHovering =
-    let
-        dzAttrs = DZ.dzAttrs (OnDragEnter 1) (OnDragEnter -1) NoOp OnDrop
-    in
-        if dragHovering > 0 then
-            class "drop-zone active" :: dzAttrs
-        else
-            class "drop-zone" :: dzAttrs
+        , p [] [ text model.message ]
+        , Html.button [ Events.onClick Shuffle ] [ text "シャッフルする" ]
+        , deckTable model.deck
+        ]
 
 
 deckTable : Deck -> Html Msg
@@ -214,21 +189,17 @@ parseCSVRecord unparsed =
         (parsed, pivot, rest) =
             split (\c -> c == '\n' || c == '"') unparsed
     in
-        case pivot of
-            Nothing ->
-                (parsed, [])
+        if pivot == Just '"' then
+            let
+                (quoted, _, rest_) =
+                    split (\c -> c == '"') rest
 
-            Just c ->
-                if c == '\n' then
-                    (parsed, rest)
-                else
-                    let
-                        (quoted, _, rest_) =
-                            split (\c -> c == '"') rest
-                        (following, rest__) =
-                            parseCSVRecord rest_
-                    in
-                        (parsed ++ quoted ++ following, rest__)
+                (following, rest__) =
+                    parseCSVRecord rest_
+            in
+                (parsed ++ quoted ++ following, rest__)
+        else
+            (parsed, rest)
 
 
 split : (a -> Bool) -> List a -> (List a, Maybe a, List a)
